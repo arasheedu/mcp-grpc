@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package mcp.weather;
+option csharp_namespace = "Mcp.Weather";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// ============== Core MCP Types ==============
+
+message Implementation {
+  string name = 1;
+  string version = 2;
+}
+
+message ClientCapabilities {
+  map<string, google.protobuf.Struct> experimental = 1;
+}
+
+message ServerCapabilities {
+  message Tools {
+    bool available = 1;
+  }
+  Tools tools = 1;
+}
+
+message Result {
+  google.protobuf.Struct _meta = 1;
+}
+
+// ============== Content Types ==============
+
+message TextContent {
+  string text = 1;
+  string type = 2; // "text"
+}
+
+message Content {
+  oneof content {
+    TextContent text = 1;
+  }
+}
+
+// ============== Tool Definition ==============
+
+message Tool {
+  string name = 1;
+  string description = 2;
+  
+  message InputSchema {
+    string type = 1; // "object"
+    map<string, google.protobuf.Struct> properties = 2;
+    repeated string required = 3;
+  }
+  InputSchema inputSchema = 3;
+}
+
+// ============== Initialize ==============
+
+message InitializeRequest {
+  string method = 1; // "initialize"
+  message Params {
+    ClientCapabilities capabilities = 1;
+    Implementation clientInfo = 2;
+    string protocolVersion = 3;
+  }
+  Params params = 2;
+}
+
+message InitializeResult {
+  ServerCapabilities capabilities = 1;
+  string protocolVersion = 2;
+  Implementation serverInfo = 3;
+  string instructions = 4;
+}
+
+// ============== Ping ==============
+
+message PingRequest {
+  string method = 1; // "ping"
+  message Params {}
+  Params params = 2;
+}
+
+// ============== List Tools ==============
+
+message ListToolsRequest {
+  string method = 1; // "tools/list"
+  message Params {
+    string cursor = 1;
+  }
+  Params params = 2;
+}
+
+message ListToolsResult {
+  repeated Tool tools = 1;
+  string nextCursor = 2;
+}
+
+// ============== Call Tool ==============
+
+message CallToolRequest {
+  string method = 1; // "tools/call"
+  message Params {
+    string name = 1;
+    google.protobuf.Struct arguments = 2;
+  }
+  Params params = 2;
+}
+
+message CallToolResult {
+  repeated Content content = 1;
+  bool isError = 2;
+}
+
+// ============== Weather-Specific Types ==============
+
+// Weather Alert structure
+message WeatherAlert {
+  string event = 1;
+  string areaDesc = 2;
+  string severity = 3;
+  string description = 4;
+  string instruction = 5;
+  google.protobuf.Timestamp effective = 6;
+  google.protobuf.Timestamp expires = 7;
+}
+
+// Weather Forecast Period
+message ForecastPeriod {
+  string name = 1;
+  int32 temperature = 2;
+  string temperatureUnit = 3;
+  string windSpeed = 4;
+  string windDirection = 5;
+  string shortForecast = 6;
+  string detailedForecast = 7;
+  bool isDaytime = 8;
+  int32 number = 9;
+}
+
+// Get Alerts Request (internal representation)
+message GetAlertsRequest {
+  string state = 1; // 2-letter US state abbreviation
+}
+
+// Get Alerts Response (internal representation)
+message GetAlertsResponse {
+  repeated WeatherAlert alerts = 1;
+  string state = 2;
+  google.protobuf.Timestamp retrievedAt = 3;
+}
+
+// Get Forecast Request (internal representation)
+message GetForecastRequest {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// Get Forecast Response (internal representation)
+message GetForecastResponse {
+  repeated ForecastPeriod periods = 1;
+  double latitude = 2;
+  double longitude = 3;
+  google.protobuf.Timestamp retrievedAt = 4;
+}
+
+// ============== Service Definition ==============
+
+service WeatherService {
+  // Core MCP methods
+  rpc Initialize(InitializeRequest) returns (InitializeResult);
+  rpc Ping(PingRequest) returns (Result);
+  
+  // Tool methods
+  rpc ListTools(ListToolsRequest) returns (ListToolsResult);
+  rpc CallTool(CallToolRequest) returns (CallToolResult);
+}
+
+// ============== Tool Schemas Documentation ==============
+// This section documents the expected JSON structure for tool arguments
+
+// GetAlerts tool schema:
+// {
+//   "name": "GetAlerts",
+//   "description": "Get weather alerts for a US state.",
+//   "inputSchema": {
+//     "type": "object",
+//     "properties": {
+//       "state": {
+//         "type": "string",
+//         "description": "The US state to get alerts for. Use the 2 letter abbreviation for the state (e.g. NY).",
+//         "pattern": "^[A-Z]{2}$"
+//       }
+//     },
+//     "required": ["state"]
+//   }
+// }
+
+// GetForecast tool schema:
+// {
+//   "name": "GetForecast", 
+//   "description": "Get weather forecast for a location.",
+//   "inputSchema": {
+//     "type": "object",
+//     "properties": {
+//       "latitude": {
+//         "type": "number",
+//         "description": "Latitude of the location.",
+//         "minimum": -90,
+//         "maximum": 90
+//       },
+//       "longitude": {
+//         "type": "number",
+//         "description": "Longitude of the location.",
+//         "minimum": -180,
+//         "maximum": 180
+//       }
+//     },
+//     "required": ["latitude", "longitude"]
+//   }
+// }
